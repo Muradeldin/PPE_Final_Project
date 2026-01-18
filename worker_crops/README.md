@@ -1,0 +1,1 @@
+This directory stores visual results of personnel failing to wear mandatory helmets and safety vests
