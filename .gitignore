@@ -1,1 +1,4 @@
 FinalProject/
+.DS_Store
+__pycache__/
+worker_crops/
