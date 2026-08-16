@@ -6,12 +6,12 @@ from datetime import datetime
 
 # ---------------- CONFIG ----------------
 VIDEO_PATH = Path(__file__).parent / "media/cctv_test.mp4"
-MODEL_PATH = "best_yolo8.pt"  
+MODEL_PATH = "best_yolo11_ncnn_model"  
 
 SAVE_EVERY_SECONDS = 0.5      # update each tracked worker status this often
-PPE_CONF_THRESH = 0.20
-VEST_THRESH = 0.40
-HELMET_MARGIN = 0.40
+PPE_CONF_THRESH = 0.10
+VEST_THRESH = 0.25    # change for the ncnn makes detection better 
+HELMET_MARGIN = 0.20
 
 # Your dataset class IDs (EDIT THESE!)
 PERSON_ID = 6
@@ -33,7 +33,7 @@ CROP_SAVE_COOLDOWN = 3.0         # optional: avoid saving every frame after trig
 # ----------------------------------------
 
 
-model = YOLO(MODEL_PATH)
+model = YOLO(MODEL_PATH, task="detect")
 
 
 violation_since = {}             # {worker_id: first_time_noncompliant}
@@ -61,8 +61,8 @@ def ppe_for_person(person_xyxy, ppe_dets, worker_id=None):
     # Helmet region: top 35% of person
     helmet_y2 = py1 + 0.35 * ph
     # Vest region: middle chunk (roughly torso)
-    vest_y1 = py1 + 0.30 * ph
-    vest_y2 = py1 + 0.75 * ph
+    vest_y1 = py1 + 0.20 * ph
+    vest_y2 = py1 + 0.85 * ph
 
     best = {}  # best confidence per class for this person
 
