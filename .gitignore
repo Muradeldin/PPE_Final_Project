@@ -1,3 +1,5 @@
 FinalProject/
 .DS_Store
 __pycache__/
+annotated_output.mp4
+worker_crops/worker_*
