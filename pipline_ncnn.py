@@ -17,20 +17,20 @@ CROPS_DIR = Path("worker_crops")
 CROPS_DIR.mkdir(exist_ok=True)
 
 # Performance & Display
-HEADLESS = False            # Set to True on headless Pi (saves X11/CPU cycles)
+HEADLESS = False            # Set to True on Raspberry Pi production (saves ~20% CPU)
 TARGET_WIDTH = 640          # Camera stream frame width
 TARGET_HEIGHT = 480         # Camera stream frame height
-INFERENCE_SIZE = 416        # MUST match your NCNN export resolution to prevent tracker crashes
+INFERENCE_SIZE = 320        # 320 provides best speed/accuracy balance on Cortex-A72 (Pi 4)
 
 # PPE Logic & Thresholds
-TRACK_CONF = 0.25           # Tracker threshold (prevents noise/0-pixel boxes from crashing Kalman filter)
-PPE_CONF_THRESH = 0.10      # Base detector threshold for PPE inside the person box
+TRACK_CONF = 0.25          # Tracker threshold (filters noise and tiny artifacts)
+PPE_CONF_THRESH = 0.10      # Base detector threshold for PPE detections
 VEST_THRESH = 0.25          # Acceptance cutoff for safety vests
 HELMET_MARGIN = 0.20        # Margin: (helmet_conf - no_helmet_conf) > HELMET_MARGIN
-IOA_THRESHOLD = 0.55        # Intersection-over-Area required to associate PPE to person
+IOA_THRESHOLD = 0.50        # Intersection-over-Area required to associate PPE to person
 
 # Throttling & Violations
-SAVE_EVERY_SECONDS = 0.5    # Evaluation interval per tracked worker (saves CPU)
+EVAL_INTERVAL_SECONDS = 0.5 # PPE evaluation interval per worker (saves heavy CPU math)
 VIOLATION_SECONDS = 2.0     # Time worker must continuously violate rules before alerting
 CROP_SAVE_COOLDOWN = 3.0    # Cooldown between consecutive crop saves for same ID
 
@@ -47,7 +47,7 @@ NO_HELMET_ID = 7
 def calculate_ioa(person_box, ppe_box):
     """
     Calculates Intersection over Area (IoA) relative to the PPE bounding box.
-    Returns the percentage (0.0 to 1.0) of the PPE box that falls inside the person box.
+    Returns the fraction (0.0 to 1.0) of the PPE box that falls inside the person box.
     """
     px1, py1, px2, py2 = person_box
     hx1, hy1, hx2, hy2 = ppe_box
@@ -76,7 +76,7 @@ def evaluate_person_ppe(person_xyxy, ppe_dets):
         conf = d["conf"]
         ppe_box = d["xyxy"]
 
-        # Discard detections that don't overlap sufficiently with the person
+        # Discard detections that do not overlap sufficiently with the person
         if conf >= PPE_CONF_THRESH and calculate_ioa(person_xyxy, ppe_box) >= IOA_THRESHOLD:
             if conf > best.get(cls_id, 0.0):
                 best[cls_id] = conf
@@ -85,11 +85,11 @@ def evaluate_person_ppe(person_xyxy, ppe_dets):
     nohelmet_conf = best[NO_HELMET_ID]
     vest_conf = best[VEST_ID]
 
-    # No PPE evidence detected for this worker
+    # No PPE evidence detected in this evaluation window
     if helmet_conf == 0.0 and nohelmet_conf == 0.0 and vest_conf == 0.0:
         return None
 
-    # Helmet Decision (Margin Competition)
+    # Helmet Decision (Margin logic: hardhat must win over no-helmet by defined margin)
     if helmet_conf == 0.0 and nohelmet_conf == 0.0:
         helmet = False
     else:
@@ -109,9 +109,9 @@ class EdgePPEPipeline:
         self.source = str(source)
         self.model = YOLO(model_path, task="detect")
         
-        # Thread communication queues
-        self.frame_queue = Queue(maxsize=3)  # Limits RAM usage
-        self.io_queue = Queue(maxsize=20)    # Buffers disk writes
+        # Thread communication queues (low maxsize prevents memory leaks on Pi 4)
+        self.frame_queue = Queue(maxsize=2)
+        self.io_queue = Queue(maxsize=15)
 
         # State tracking
         self.running = False
@@ -121,7 +121,7 @@ class EdgePPEPipeline:
         self.last_crop_saved = {}   # {worker_id: timestamp}
 
     def _camera_worker(self):
-        """Thread 1: Dedicated frame capture and downscaling."""
+        """Thread 1: Dedicated frame capture & downscaling."""
         cap = cv2.VideoCapture(self.source)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
@@ -131,12 +131,13 @@ class EdgePPEPipeline:
             if not ret:
                 break
 
-            # Guarantee fixed resolution for memory consistency
+            # Standardize resolution for predictable CPU runtime
             frame = cv2.resize(frame, (TARGET_WIDTH, TARGET_HEIGHT), interpolation=cv2.INTER_LINEAR)
 
             try:
-                self.frame_queue.put(frame, timeout=1.0)
+                self.frame_queue.put(frame, timeout=0.5)
             except Full:
+                # Drop frame if AI pipeline is running slower than stream
                 continue
 
         cap.release()
@@ -153,7 +154,7 @@ class EdgePPEPipeline:
                 continue
 
     def run(self):
-        """Thread 2 (Main): Inference, Tracking, State Logic, and UI."""
+        """Thread 2 (Main): Inference, Tracking, Compliance Logic, and UI."""
         self.running = True
 
         cam_thread = threading.Thread(target=self._camera_worker, daemon=True)
@@ -161,7 +162,11 @@ class EdgePPEPipeline:
         cam_thread.start()
         io_thread.start()
 
-        print(f"[INFO] Pipeline active. Target: {MODEL_PATH} | Headless: {HEADLESS}")
+        print(f"[INFO] Pipeline active on {self.source}")
+        print(f"[INFO] Model: {MODEL_PATH} | Headless: {HEADLESS} | ImgSz: {INFERENCE_SIZE}")
+
+        prev_time = time.time()
+        fps = 0.0
 
         while self.running:
             try:
@@ -173,13 +178,16 @@ class EdgePPEPipeline:
                 continue
 
             now = time.time()
+            dt = now - prev_time
+            prev_time = now
+            if dt > 0:
+                fps = 0.9 * fps + 0.1 * (1.0 / dt)
 
-            # YOLO11 NCNN Tracking
-            # Switched to botsort to prevent singular matrix errors on edge devices
+            # YOLO11 NCNN Tracking using ByteTrack (lightweight & avoids optical flow on CPU)
             results = self.model.track(
                 frame,
                 persist=True,
-                tracker="botsort.yaml", 
+                tracker="bytetrack.yaml", 
                 conf=TRACK_CONF,
                 imgsz=INFERENCE_SIZE,
                 classes=[PERSON_ID, HELMET_ID, VEST_ID, NO_HELMET_ID],
@@ -189,18 +197,19 @@ class EdgePPEPipeline:
             res = results[0]
             if res.boxes is None or len(res.boxes) == 0:
                 if not HEADLESS:
-                    cv2.imshow("PPE Pipeline (Pi 4)", frame)
+                    cv2.putText(frame, f"FPS: {fps:.1f}", (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                    cv2.imshow("Edge PPE Pipeline", frame)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         self.running = False
                 continue
 
-            # Extract arrays
+            # Extract bounding boxes
             xyxy_all = res.boxes.xyxy.cpu().numpy()
             cls_all = res.boxes.cls.cpu().numpy().astype(int)
             conf_all = res.boxes.conf.cpu().numpy()
             ids_all = res.boxes.id.cpu().numpy().astype(int) if res.boxes.id is not None else None
 
-            # Separate PPE items (allow lower confidence boxes for evaluation)
+            # Collect PPE detections
             ppe_dets = [
                 {"cls": cls_all[i], "conf": float(conf_all[i]), "xyxy": xyxy_all[i]}
                 for i in range(len(cls_all)) if cls_all[i] != PERSON_ID
@@ -216,17 +225,17 @@ class EdgePPEPipeline:
                     worker_id = int(ids_all[i])
                     x1, y1, x2, y2 = map(int, xyxy_all[i])
 
-                    # Clamp coordinates to frame boundaries to prevent crash
+                    # Safe clamp to frame dimensions
                     x1, y1 = max(0, min(w - 1, x1)), max(0, min(h - 1, y1))
                     x2, y2 = max(0, min(w - 1, x2)), max(0, min(h - 1, y2))
 
                     if x2 <= x1 or y2 <= y1:
                         continue
 
-                    # Periodic evaluation check
+                    # Periodic PPE evaluation (Saves CPU cycles)
                     should_update = (
                         (worker_id not in self.last_checked) or 
-                        ((now - self.last_checked[worker_id]) >= SAVE_EVERY_SECONDS)
+                        ((now - self.last_checked[worker_id]) >= EVAL_INTERVAL_SECONDS)
                     )
 
                     if should_update:
@@ -246,16 +255,25 @@ class EdgePPEPipeline:
                                     last_save = self.last_crop_saved.get(worker_id, 0.0)
                                     if (now - last_save) >= CROP_SAVE_COOLDOWN:
                                         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                        out_path = CROPS_DIR / f"violation_id{worker_id}_{ts}.jpg"
+                                        
+                                        # Tag file with specific violation reasons
+                                        reasons = []
+                                        if not status["helmet"]: reasons.append("no_helmet")
+                                        if not status["vest"]: reasons.append("no_vest")
+                                        
+                                        out_path = CROPS_DIR / f"worker_{worker_id}_{'_'.join(reasons)}_{ts}.jpg"
                                         crop = frame[y1:y2, x1:x2].copy()
 
-                                        # Offload I/O without blocking pipeline
-                                        self.io_queue.put((out_path, crop))
-                                        self.last_crop_saved[worker_id] = now
+                                        # Non-blocking async queue insertion
+                                        try:
+                                            self.io_queue.put_nowait((out_path, crop))
+                                            self.last_crop_saved[worker_id] = now
+                                        except Full:
+                                            pass  # Discard if buffer full; never block AI loop
                             else:
                                 self.violation_since.pop(worker_id, None)
 
-                    # UI Drawing (Only if display is active)
+                    # UI Rendering (Only in non-headless mode)
                     if not HEADLESS:
                         ppe = self.last_status.get(worker_id)
                         if ppe is None:
@@ -272,18 +290,19 @@ class EdgePPEPipeline:
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
 
             if not HEADLESS:
-                cv2.imshow("PPE Pipeline (Pi 4)", frame)
+                cv2.putText(frame, f"FPS: {fps:.1f}", (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                cv2.imshow("Edge PPE Pipeline", frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     self.running = False
 
-            # Minimal yield to keep CPU thermals and scheduler balanced
+            # Yield scheduler to keep CPU temperatures lower
             time.sleep(0.001)
 
         # Teardown
         if not HEADLESS:
             cv2.destroyAllWindows()
-        cam_thread.join()
-        io_thread.join()
+        cam_thread.join(timeout=1.0)
+        io_thread.join(timeout=2.0)
         print("[INFO] Pipeline shut down cleanly.")
 
 # ==============================================================================

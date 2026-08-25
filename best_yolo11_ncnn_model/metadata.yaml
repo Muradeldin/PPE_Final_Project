@@ -1,0 +1,30 @@
+description: Ultralytics YOLO11n model trained on /usr/local/lib/python3.12/dist-packages/ultralytics/cfg/datasets/construction-ppe.yaml
+author: Ultralytics
+date: '2026-08-25T20:53:49.307787'
+version: 8.4.95
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+head: Detect
+batch: 1
+imgsz:
+- 416
+- 416
+names:
+  0: helmet
+  1: gloves
+  2: vest
+  3: boots
+  4: goggles
+  5: none
+  6: Person
+  7: no_helmet
+  8: no_goggle
+  9: no_gloves
+  10: no_boots
+args:
+  batch: 1
+  quantize: 16
+channels: 3
+end2end: false
