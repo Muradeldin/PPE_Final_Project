@@ -1,6 +1,7 @@
 import cv2
 import time
 import threading
+import requests
 from queue import Queue, Empty, Full
 from pathlib import Path
 from datetime import datetime
@@ -13,8 +14,9 @@ from ultralytics import YOLO
 # Input / Output
 VIDEO_PATH = Path(__file__).parent / "media" / "cctv_test.mp4"
 MODEL_PATH = "best_yolo8_ncnn_model"  # Make sure this was exported at imgsz=320!
-CROPS_DIR = Path("worker_crops")
-CROPS_DIR.mkdir(exist_ok=True)
+
+# REPLACE THIS WITH YOUR MAC'S TAILSCALE IP ADDRESS (e.g., "http://100.64.1.2:8080/api/upload-crop")
+CLOUD_WEBHOOK_URL = "http://YOUR_MAC_TAILSCALE_IP:8080/api/upload-crop"
 
 # Performance & Display
 HEADLESS = True            
@@ -31,7 +33,7 @@ IOA_THRESHOLD = 0.30        # Lowered to allow bulky vests to overhang outside t
 
 # Timing & Throttling
 EVAL_INTERVAL_SECONDS = 0.5 
-GLOBAL_CROP_COOLDOWN = 3.0  # Prevents SD card spam
+GLOBAL_CROP_COOLDOWN = 3.0  # Prevents spamming webhooks
 
 # Class IDs (Must match your trained dataset)
 PERSON_ID = 6
@@ -125,7 +127,7 @@ def evaluate_person_ppe(person_xyxy, ppe_dets):
 # ==============================================================================
 
 class EdgePPEPipeline:
-    def __init__(self, source, model_path):
+    def __init__(self, source=VIDEO_PATH, model_path=MODEL_PATH):
         self.source = str(source)
         self.model = YOLO(model_path, task="detect")
         
@@ -157,14 +159,29 @@ class EdgePPEPipeline:
         cap.release()
 
     def _io_worker(self):
+        """Asynchronously sends violation crops to the Cloud Admin Dashboard via HTTP POST."""
         while self.running or not self.io_queue.empty():
             try:
                 task = self.io_queue.get(timeout=0.5)
-                file_path, image = task
-                cv2.imwrite(str(file_path), image)
+                worker_id, reasons_str, crop = task
+                
+                # Encode crop to JPEG in memory
+                _, img_encoded = cv2.imencode('.jpg', crop)
+                files = {'file': (f"worker_{worker_id}.jpg", img_encoded.tobytes(), 'image/jpeg')}
+                data = {'worker_id': str(worker_id), 'reasons': reasons_str}
+
+                # Push to cloud dashboard
+                response = requests.post(CLOUD_WEBHOOK_URL, files=files, data=data, timeout=5)
+                if response.status_code == 200:
+                    print(f"[INFO] Successfully uploaded violation for Worker {worker_id}")
+                else:
+                    print(f"[WARNING] Cloud responded with status {response.status_code}")
+
                 self.io_queue.task_done()
             except Empty:
                 continue
+            except Exception as e:
+                print(f"[ERROR] Failed to send webhook to cloud: {e}")
 
     def run(self):
         self.running = True
@@ -270,19 +287,18 @@ class EdgePPEPipeline:
                         if noncompliant:
                             # Trigger violation off global cooldown
                             if (now - self.last_global_save) >= GLOBAL_CROP_COOLDOWN:
-                                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                
                                 reasons = []
                                 if not status["helmet"]: reasons.append("no_helmet")
                                 if not status["vest"]: reasons.append("no_vest")
+                                reasons_str = "_".join(reasons)
                                 
-                                out_path = CROPS_DIR / f"worker_{worker_id}_{'_'.join(reasons)}_{ts}.jpg"
                                 crop = frame[y1:y2, x1:x2].copy()
 
                                 try:
-                                    self.io_queue.put_nowait((out_path, crop))
+                                    # Push data to asynchronous webhook queue
+                                    self.io_queue.put_nowait((worker_id, reasons_str, crop))
                                     self.last_global_save = now
-                                    print(f"[ALERT] Violation! Crop saved to: {out_path.name}")
+                                    print(f"[ALERT] Violation! Webhook queued for Worker ID: {worker_id}")
                                 except Full:
                                     pass  
 

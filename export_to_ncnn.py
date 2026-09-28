@@ -1,7 +1,5 @@
 from ultralytics import YOLO
 
-# Load your trained PyTorch model
-model = YOLO("best_yolo11.pt")
-
-# Export the model to NCNN format with FP16 (half-precision)
-model.export(format="ncnn", half=True)
+model = YOLO("best_yolo8.pt")
+# imgsz must match INFERENCE_SIZE in your edge script
+model.export(format="ncnn", imgsz=320, half=True)
