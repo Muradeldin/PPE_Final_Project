@@ -70,11 +70,13 @@ class StreamServer:
 
         last_frame_id = None
         last_sent = 0.0
+        connected_at = time.time()
         try:
             while True:
                 pipeline = self.get_pipeline()
                 running = pipeline is not None and pipeline.running
                 idle = time.time() - last_sent
+                waiting = time.time() - max(last_sent, connected_at)  # No frame yet, e.g. model still loading
 
                 if running:
                     pipeline.request_stream()  # Tells the pipeline to keep drawing frames
@@ -85,7 +87,7 @@ class StreamServer:
                         jpeg = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])[1].tobytes()
                         self._send(request, jpeg)
                         last_sent = time.time()
-                    elif idle >= 3.0:
+                    elif waiting >= 3.0:
                         self._send(request, self.starting_jpeg)
                         last_sent = time.time()
                 elif idle >= 1.0:

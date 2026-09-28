@@ -56,6 +56,7 @@ function showView(session) {
   $('#loginView').hidden = signedIn;
   $('#appView').hidden = !signedIn;
   $('#account').hidden = !signedIn;
+  $('#viewNav').hidden = !signedIn;
 
   if (signedIn) {
     $('#accountEmail').textContent = session.user.email;
@@ -124,28 +125,47 @@ function renderDevice() {
 
 // ---- Live view ----------------------------------------------------------------
 // The Pi streams MJPEG through Tailscale Funnel; the link (with its secret token) comes from
-// device_status, which only signed-in users can read. The stream only runs while it is on screen.
+// device_status, which only signed-in users can read. The camera replaces the radar while
+// detection runs, and the stream only runs while the Live page is on screen.
 
+const hero = $('#hero');
+const radar = $('#radar');
+const liveFrame = $('#liveFrame');
 const liveImage = $('#liveImage');
 const livePlaceholder = $('#livePlaceholder');
 let liveFailedAt = 0;
 
-function showLivePlaceholder(message) {
+function stopStream() {
   if (liveImage.dataset.src) {
     liveImage.src = 'data:,';  // Closes the connection to the Pi
     delete liveImage.dataset.src;
   }
   liveImage.hidden = true;
+}
+
+function showLiveFrame(show) {
+  hero.classList.toggle('live-on', show);
+  liveFrame.hidden = !show;
+  radar.hidden = show;
+}
+
+function showLiveMessage(message) {
+  stopStream();
   livePlaceholder.hidden = false;
   livePlaceholder.textContent = message;
 }
 
 function updateLiveView(online, running) {
+  if (!running || currentPage() !== 'live') {
+    stopStream();
+    showLiveFrame(false);
+    return;
+  }
+
+  showLiveFrame(true);
   const url = device?.stream_url;
-  if (!online) return showLivePlaceholder('The Pi is offline');
-  if (!running) return showLivePlaceholder('Start detection to see the camera');
-  if (!url) return showLivePlaceholder('The Pi has not reported a stream address');
-  if (document.visibilityState !== 'visible') return showLivePlaceholder('Paused while the tab is hidden');
+  if (!url) return showLiveMessage('The Pi has not reported a stream address');
+  if (document.visibilityState !== 'visible') return showLiveMessage('Paused while the tab is hidden');
   if (Date.now() - liveFailedAt < 10_000) return;  // Recently failed: keep the error message, retry later
 
   if (liveImage.dataset.src !== url) {
@@ -159,7 +179,7 @@ function updateLiveView(online, running) {
 liveImage.addEventListener('error', () => {
   if (!liveImage.dataset.src) return;  // Our own 'data:,' reset, not a real failure
   liveFailedAt = Date.now();
-  showLivePlaceholder("Can't reach the Pi's live stream");
+  showLiveMessage("Can't reach the Pi's live stream");
 });
 
 document.addEventListener('visibilitychange', () => {
@@ -207,6 +227,8 @@ function renderStats() {
   $('#statVest').textContent = today.filter((v) => v.reasons.includes('no_vest')).length;
   const open = violations.filter((v) => !v.acknowledged).length;
   $('#statOpen').textContent = open;
+  $('#navCount').textContent = open;
+  $('#navCount').hidden = open === 0;
   $('#ackAllButton').disabled = open === 0;
 }
 
@@ -329,9 +351,30 @@ function startPolling() {
 function stopPolling() {
   clearInterval(pollTimer);
   pollTimer = null;
-  showLivePlaceholder('Start detection to see the camera');
+  stopStream();
+  showLiveFrame(false);
   device = null;
   violations = [];
   seenIds = null;
   photoLinks.clear();
 }
+
+// ---- Pages (#live / #violations) ----------------------------------------------
+
+function currentPage() {
+  return location.hash === '#violations' ? 'violations' : 'live';
+}
+
+function showPage() {
+  const page = currentPage();
+  document.querySelectorAll('[data-view-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.viewPanel !== page;
+  });
+  document.querySelectorAll('.view-link').forEach((link) => {
+    link.classList.toggle('active', link.dataset.view === page);
+  });
+  if (device) renderDevice();  // Starts or stops the livestream
+}
+
+window.addEventListener('hashchange', showPage);
+showPage();

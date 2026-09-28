@@ -15,6 +15,10 @@
           <p class="eyebrow">Raspberry Pi 4 / edge vision</p>
           <h1>Edge PPE Monitor</h1>
         </div>
+        <nav class="views" id="viewNav" aria-label="Pages" hidden>
+          <a class="view-link" href="#live" data-view="live">Live</a>
+          <a class="view-link" href="#violations" data-view="violations">Violations <span class="count" id="navCount" hidden>0</span></a>
+        </nav>
         <div class="connection" id="connectionState">
           <span class="status-dot"></span>
           <span>Connecting</span>
@@ -46,61 +50,58 @@
         </form>
       </section>
 
-      <!-- Dashboard (shown when logged in) -->
+      <!-- Signed-in app: two pages, switched by the nav (#live / #violations) -->
       <div id="appView" hidden>
-        <section class="hero">
-          <div class="hero-copy">
-            <p class="eyebrow accent">Live safety operations</p>
-            <h2>Keep every shift<br /><em>in view.</em></h2>
-            <p class="lede">Start the on-device PPE detector and monitor its connection without leaving the control desk.</p>
-            <div class="actions">
-              <button class="button button-primary" id="startButton" type="button">Start detection <span>→</span></button>
-              <button class="button button-secondary" id="stopButton" type="button">Stop pipeline</button>
+        <!-- Live page -->
+        <div data-view-panel="live">
+          <section class="hero" id="hero">
+            <div class="hero-copy">
+              <p class="eyebrow accent">Live safety operations</p>
+              <h2>Keep every shift<br /><em>in view.</em></h2>
+              <p class="lede">Start the on-device PPE detector and watch what the camera sees, with every worker checked for a helmet and vest.</p>
+              <div class="actions">
+                <button class="button button-primary" id="startButton" type="button">Start detection <span>→</span></button>
+                <button class="button button-secondary" id="stopButton" type="button">Stop pipeline</button>
+              </div>
             </div>
-          </div>
-          <div class="radar" aria-label="Detection system status">
-            <div class="radar-ring ring-one"></div>
-            <div class="radar-ring ring-two"></div>
-            <div class="radar-sweep"></div>
-            <div class="radar-core"><span id="radarLabel">STANDBY</span></div>
-            <span class="radar-ping ping-one"></span>
-            <span class="radar-ping ping-two"></span>
-          </div>
-        </section>
 
-        <section class="status-grid" aria-label="Pipeline details">
-          <article class="stat-card stat-card-highlight">
-            <p class="stat-label">Pipeline state</p>
-            <p class="stat-value" id="pipelineState">Offline</p>
-            <p class="stat-note" id="lastUpdate">Waiting for the Pi</p>
-          </article>
-          <article class="stat-card">
-            <p class="stat-label">Input source</p>
-            <p class="stat-value stat-value-small" id="sourceValue">—</p>
-            <p class="stat-note">Configured on the Pi</p>
-          </article>
-          <article class="stat-card">
-            <p class="stat-label">Detection model</p>
-            <p class="stat-value stat-value-small">YOLOv8 NCNN</p>
-            <p class="stat-note" id="modelNote">320 px inference</p>
-          </article>
-        </section>
-
-        <section class="live" aria-label="Live view">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow accent">Camera</p>
-              <h3>Live view</h3>
+            <!-- Radar while stopped; live camera while detection runs -->
+            <div class="radar" id="radar" aria-label="Detection system status">
+              <div class="radar-ring ring-one"></div>
+              <div class="radar-ring ring-two"></div>
+              <div class="radar-sweep"></div>
+              <div class="radar-core"><span id="radarLabel">STANDBY</span></div>
+              <span class="radar-ping ping-one"></span>
+              <span class="radar-ping ping-two"></span>
             </div>
-            <p class="stat-note" id="liveNote">Plays while detection is running</p>
-          </div>
-          <div class="live-frame">
-            <img id="liveImage" alt="Live detection video from the Pi" hidden />
-            <p class="live-placeholder" id="livePlaceholder">Start detection to see the camera</p>
-          </div>
-        </section>
+            <figure class="live-frame" id="liveFrame" hidden>
+              <img id="liveImage" alt="Live detection video from the Pi" hidden />
+              <p class="live-placeholder" id="livePlaceholder">Connecting to the camera…</p>
+              <figcaption class="live-badge"><span class="live-dot"></span>Live</figcaption>
+            </figure>
+          </section>
 
-        <section class="violations" aria-label="Violations">
+          <section class="status-grid" aria-label="Pipeline details">
+            <article class="stat-card stat-card-highlight">
+              <p class="stat-label">Pipeline state</p>
+              <p class="stat-value" id="pipelineState">Offline</p>
+              <p class="stat-note" id="lastUpdate">Waiting for the Pi</p>
+            </article>
+            <article class="stat-card">
+              <p class="stat-label">Input source</p>
+              <p class="stat-value stat-value-small" id="sourceValue">—</p>
+              <p class="stat-note">Configured on the Pi</p>
+            </article>
+            <article class="stat-card">
+              <p class="stat-label">Detection model</p>
+              <p class="stat-value stat-value-small">YOLOv8 NCNN</p>
+              <p class="stat-note" id="modelNote">320 px inference</p>
+            </article>
+          </section>
+        </div>
+
+        <!-- Violations page -->
+        <section class="violations" data-view-panel="violations" aria-label="Violations" hidden>
           <div class="section-head">
             <div>
               <p class="eyebrow accent">Safety log</p>
