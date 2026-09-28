@@ -1,0 +1,10 @@
+# Runtime (PC and Raspberry Pi)
+ultralytics>=8.3
+ncnn
+lap            # used by ByteTrack for tracking
+fastapi        # app.py
+uvicorn        # app.py
+requests       # pipeline_ncnn_web.py uploads
+
+# Only needed to export models to NCNN (export_to_ncnn.py)
+pnnx

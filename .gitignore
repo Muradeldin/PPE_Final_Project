@@ -1,3 +1,8 @@
 FinalProject/
 .DS_Store
 __pycache__/
+.vscode/
+
+# Generated output
+/worker_crops/
+/runs/

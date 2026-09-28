@@ -1,6 +1,6 @@
 import uvicorn
 from fastapi import FastAPI, BackgroundTasks
-from pipline_ncnn_web import EdgePPEPipeline
+from pipeline_ncnn_web import EdgePPEPipeline, MODEL_PATH
 
 app = FastAPI(title="Edge PPE Controller")
 pipeline_instance = None
@@ -16,7 +16,7 @@ def start_detection(background_tasks: BackgroundTasks):
     # Initialize the pipeline from your imported file
     pipeline_instance = EdgePPEPipeline(
         source="media/cctv_test.mp4", 
-        model_path="best_yolo8_ncnn_model"
+        model_path=MODEL_PATH
     )
     
     # Run the pipeline loop in a background thread

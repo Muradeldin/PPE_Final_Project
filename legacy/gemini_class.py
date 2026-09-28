@@ -11,13 +11,13 @@ from ultralytics import YOLO
 # ==============================================================================
 
 # Input / Output
-VIDEO_PATH = Path(__file__).parent / "media" / "cctv_test.mp4"
-MODEL_PATH = "best_yolo8_ncnn_model"  # Make sure this was exported at imgsz=320!
+VIDEO_PATH = Path(__file__).parent / "media" / "cctv_test_2.mp4"
+MODEL_PATH = "best_yolo8_ncnn_model_half"  # Make sure this was exported at imgsz=320!
 CROPS_DIR = Path("worker_crops")
 CROPS_DIR.mkdir(exist_ok=True)
 
 # Performance & Display
-HEADLESS = True            
+HEADLESS = False            
 TARGET_WIDTH = 640          
 TARGET_HEIGHT = 480         
 INFERENCE_SIZE = 320        
