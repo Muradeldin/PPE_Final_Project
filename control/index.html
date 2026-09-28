@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101820" />
+    <title>Edge PPE Monitor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand-mark" aria-hidden="true">EP</div>
+        <div>
+          <p class="eyebrow">Raspberry Pi 4 / edge vision</p>
+          <h1>Edge PPE Monitor</h1>
+        </div>
+        <div class="connection" id="connectionState">
+          <span class="status-dot"></span>
+          <span>Checking backend</span>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow accent">Live safety operations</p>
+          <h2>Keep every shift<br /><em>in view.</em></h2>
+          <p class="lede">Start the on-device PPE detector and monitor its connection without leaving the control desk.</p>
+          <div class="actions">
+            <button class="button button-primary" id="startButton" type="button">Start detection <span>→</span></button>
+            <button class="button button-secondary" id="stopButton" type="button">Stop pipeline</button>
+          </div>
+        </div>
+        <div class="radar" aria-label="Detection system status">
+          <div class="radar-ring ring-one"></div>
+          <div class="radar-ring ring-two"></div>
+          <div class="radar-sweep"></div>
+          <div class="radar-core"><span id="radarLabel">STANDBY</span></div>
+          <span class="radar-ping ping-one"></span>
+          <span class="radar-ping ping-two"></span>
+        </div>
+      </section>
+
+      <section class="status-grid" aria-label="Pipeline details">
+        <article class="stat-card stat-card-highlight">
+          <p class="stat-label">Pipeline state</p>
+          <p class="stat-value" id="pipelineState">Offline</p>
+          <p class="stat-note" id="lastUpdate">Waiting for backend</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">Input source</p>
+          <p class="stat-value stat-value-small" id="sourceValue">CCTV test video</p>
+          <p class="stat-note">Configured on the Pi</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">Detection model</p>
+          <p class="stat-value stat-value-small">YOLOv8 NCNN</p>
+          <p class="stat-note">320 px inference</p>
+        </article>
+      </section>
+
+      <footer class="footer">
+        <span>Edge PPE Controller</span>
+        <span id="apiLabel">API: http://localhost:8000</span>
+      </footer>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

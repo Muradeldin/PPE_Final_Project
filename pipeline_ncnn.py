@@ -16,7 +16,7 @@ from ultralytics.utils.checks import check_yaml
 # ==============================================================================
 
 # Input / Output
-VIDEO_PATH = Path(__file__).parent / "media" / "cctv_test.mp4"
+VIDEO_PATH = Path(__file__).parent / "media" / "cctv_test_2.mp4"
 MODEL_PATH = str(Path(__file__).parent / "models" / "best_yolo8_ncnn_model_half")  # Exported at imgsz=320
 CROPS_DIR = Path("worker_crops")
 CROPS_DIR.mkdir(exist_ok=True)
@@ -156,7 +156,7 @@ def load_person_tracker():
 
 class EdgePPEPipeline:
     def __init__(self, source, model_path):
-        self.source = str(source)
+        self.source = source if isinstance(source, int) else str(source)  # int = camera index
         self.model = YOLO(model_path, task="detect")
         self.tracker = load_person_tracker()
 
@@ -167,7 +167,7 @@ class EdgePPEPipeline:
         self.last_checked = {}      # {worker_id: timestamp}
         self.last_status = {}       # {worker_id: {"helmet": bool/None, "vest": bool}}
         self.check_history = {}     # {worker_id: deque[(timestamp, helmet_bad, vest_bad)]}
-        self.last_alert = {}        # {worker_id: timestamp}
+        self.last_alert = {}        # {worker_id: {"no_helmet"/"no_vest": timestamp}}
         self.last_seen = {}         # {worker_id: timestamp}
         self.last_prune = 0.0
 
@@ -176,8 +176,21 @@ class EdgePPEPipeline:
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
 
+        # Play video files at their real frame rate, like a live camera, so the time-based
+        # alert rules behave the same on a fast PC as on the Pi
+        is_file = isinstance(self.source, str) and Path(self.source).is_file()
+        video_fps = cap.get(cv2.CAP_PROP_FPS) if is_file else 0.0
+        start = time.time()
+        frame_idx = 0
+
         while self.running and cap.isOpened():
+            if video_fps > 0:
+                time.sleep(max(0.0, start + frame_idx / video_fps - time.time()))  # wait until this frame is due
+                while (time.time() - start) * video_fps > frame_idx + 1 and cap.grab():  # too slow: skip frames
+                    frame_idx += 1
+
             ret, frame = cap.read()
+            frame_idx += 1
             if not ret:
                 break
 
@@ -311,27 +324,26 @@ class EdgePPEPipeline:
                         history.popleft()
 
                     if noncompliant:
-                        # Alert only when most recent checks agree on an item, then at most once per cooldown
+                        # Alert only when most recent checks agree on an item
                         n_checks = len(history)
                         observed_long_enough = n_checks >= MIN_CHECKS and (now - history[0][0]) >= MIN_VIOLATION_SPAN
-                        helmet_violation = sum(c[1] for c in history) / n_checks >= VIOLATION_RATIO
-                        vest_violation = sum(c[2] for c in history) / n_checks >= VIOLATION_RATIO
-                        persisted = observed_long_enough and (helmet_violation or vest_violation)
-                        cooled_down = (now - self.last_alert.get(worker_id, 0.0)) >= ALERT_COOLDOWN_SECONDS
+                        reasons = []
+                        if sum(c[1] for c in history) / n_checks >= VIOLATION_RATIO: reasons.append("no_helmet")
+                        if sum(c[2] for c in history) / n_checks >= VIOLATION_RATIO: reasons.append("no_vest")
 
-                        if persisted and cooled_down:
+                        # Cooldown is per worker AND per reason, so a new kind of violation still alerts
+                        alerted = self.last_alert.setdefault(worker_id, {})
+                        new_reason = any((now - alerted.get(r, 0.0)) >= ALERT_COOLDOWN_SECONDS for r in reasons)
+
+                        if observed_long_enough and new_reason:
                             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-                            reasons = []
-                            if helmet_violation: reasons.append("no_helmet")
-                            if vest_violation: reasons.append("no_vest")
 
                             out_path = CROPS_DIR / f"worker_{worker_id}_{'_'.join(reasons)}_{ts}.jpg"
                             crop = frame[y1:y2, x1:x2].copy()
 
                             try:
                                 self.io_queue.put_nowait((out_path, crop))
-                                self.last_alert[worker_id] = now
+                                alerted.update({r: now for r in reasons})
                                 print(f"[ALERT] Violation! Crop saved to: {out_path.name}")
                             except Full:
                                 pass

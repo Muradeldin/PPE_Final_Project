@@ -6,5 +6,8 @@ fastapi        # app.py
 uvicorn        # app.py
 requests       # pipeline_ncnn_web.py uploads
 
+# Dashboard (dashboard/server.py, runs on the Mac)
+python-multipart   # lets FastAPI receive uploaded photos
+
 # Only needed to export models to NCNN (export_to_ncnn.py)
 pnnx

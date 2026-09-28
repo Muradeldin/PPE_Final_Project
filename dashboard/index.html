@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPE Violations</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --border: #e3e6ea;
+    --text: #16191d;
+    --muted: #646b75;
+    --accent: #1f6feb;
+    --danger: #c9302c;
+    --danger-bg: #fdecea;
+    --warn: #9a6700;
+    --warn-bg: #fff4d6;
+    --ok: #1a7f37;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216;
+      --surface: #171b21;
+      --border: #2a3038;
+      --text: #e6e8eb;
+      --muted: #9aa3ad;
+      --accent: #4c8dff;
+      --danger: #ff6b63;
+      --danger-bg: #3a1a19;
+      --warn: #e3b341;
+      --warn-bg: #3a2e10;
+      --ok: #3fb950;
+      --shadow: none;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; }
+  h1 { font-size: 22px; margin: 0; }
+  .status { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .dot.offline { background: var(--danger); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .stat .label { color: var(--muted); font-size: 13px; }
+  .stat .value { font-size: 28px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .tabs { display: flex; gap: 6px; }
+  button {
+    font: inherit; font-size: 14px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    border-radius: 8px; padding: 6px 12px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column;
+  }
+  .card.new { animation: flash 2s ease-out; }
+  @keyframes flash { from { box-shadow: 0 0 0 3px var(--danger); } to { box-shadow: var(--shadow); } }
+  .card.acked { opacity: 0.55; }
+  .card img { width: 100%; height: 240px; object-fit: contain; background: #000; display: block; cursor: zoom-in; }
+  .card .body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card .worker { font-weight: 600; }
+  .card .time { color: var(--muted); font-size: 13px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .badge.helmet { color: var(--danger); background: var(--danger-bg); }
+  .badge.vest { color: var(--warn); background: var(--warn-bg); }
+  .card button { margin-top: auto; }
+
+  .empty { text-align: center; color: var(--muted); padding: 64px 16px; border: 1px dashed var(--border); border-radius: 10px; }
+
+  dialog { border: none; padding: 0; background: transparent; max-width: 95vw; }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.8); }
+  dialog img { max-width: 95vw; max-height: 90vh; display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>PPE Violations</h1>
+    <div class="status"><span class="dot" id="dot"></span><span id="status">Connecting…</span></div>
+  </header>
+
+  <section class="stats">
+    <div class="stat"><div class="label">Today</div><div class="value" id="stat-today">0</div></div>
+    <div class="stat"><div class="label">No helmet (today)</div><div class="value" id="stat-helmet">0</div></div>
+    <div class="stat"><div class="label">No vest (today)</div><div class="value" id="stat-vest">0</div></div>
+    <div class="stat"><div class="label">Not reviewed</div><div class="value" id="stat-open">0</div></div>
+  </section>
+
+  <div class="toolbar">
+    <div class="tabs">
+      <button data-filter="open" class="active">Not reviewed</button>
+      <button data-filter="all">All</button>
+    </div>
+    <button id="ack-all">Acknowledge all</button>
+  </div>
+
+  <main id="grid" class="grid"></main>
+</div>
+
+<dialog id="viewer"><img alt="Violation photo"></dialog>
+
+<script>
+  const POLL_MS = 3000;
+  let violations = [];
+  let filter = "open";
+  let seenIds = null;  // ids already shown, so new arrivals can be highlighted
+
+  const $ = (id) => document.getElementById(id);
+
+  function isToday(d) {
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  }
+
+  function timeAgo(d) {
+    const s = Math.round((Date.now() - d) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+    return d.toLocaleDateString();
+  }
+
+  function renderStats() {
+    const today = violations.filter((v) => isToday(new Date(v.received_at)));
+    $("stat-today").textContent = today.length;
+    $("stat-helmet").textContent = today.filter((v) => v.reasons.includes("no_helmet")).length;
+    $("stat-vest").textContent = today.filter((v) => v.reasons.includes("no_vest")).length;
+    const open = violations.filter((v) => !v.acknowledged).length;
+    $("stat-open").textContent = open;
+    $("ack-all").disabled = open === 0;
+  }
+
+  function card(v, isNew) {
+    const d = new Date(v.received_at);
+    const el = document.createElement("article");
+    el.className = "card" + (v.acknowledged ? " acked" : "") + (isNew ? " new" : "");
+
+    const img = document.createElement("img");
+    img.src = `/images/${encodeURIComponent(v.image)}`;
+    img.alt = `Worker ${v.worker_id}`;
+    img.loading = "lazy";
+    img.onclick = () => { $("viewer").querySelector("img").src = img.src; $("viewer").showModal(); };
+
+    const body = document.createElement("div");
+    body.className = "body";
+
+    const top = document.createElement("div");
+    top.className = "top";
+    const worker = document.createElement("span");
+    worker.className = "worker";
+    worker.textContent = `Worker ${v.worker_id}`;
+    const time = document.createElement("span");
+    time.className = "time";
+    time.textContent = `${d.toLocaleTimeString()} · ${timeAgo(d)}`;
+    time.title = d.toLocaleString();
+    top.append(worker, time);
+
+    const badges = document.createElement("div");
+    badges.className = "badges";
+    if (v.reasons.includes("no_helmet")) badges.innerHTML += '<span class="badge helmet">No helmet</span>';
+    if (v.reasons.includes("no_vest")) badges.innerHTML += '<span class="badge vest">No vest</span>';
+
+    body.append(top, badges);
+
+    if (!v.acknowledged) {
+      const btn = document.createElement("button");
+      btn.textContent = "Acknowledge";
+      btn.onclick = async () => {
+        btn.disabled = true;
+        await fetch(`/api/violations/${v.id}/acknowledge`, { method: "POST" });
+        refresh();
+      };
+      body.append(btn);
+    }
+
+    el.append(img, body);
+    return el;
+  }
+
+  function renderGrid() {
+    const shown = filter === "open" ? violations.filter((v) => !v.acknowledged) : violations;
+    const grid = $("grid");
+    grid.replaceChildren();
+    if (shown.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.style.gridColumn = "1 / -1";
+      empty.textContent = filter === "open" ? "No violations waiting for review." : "No violations recorded yet.";
+      grid.append(empty);
+    } else {
+      for (const v of shown) grid.append(card(v, seenIds !== null && !seenIds.has(v.id)));
+    }
+    seenIds = new Set(violations.map((v) => v.id));
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch("/api/violations");
+      if (!res.ok) throw new Error(res.status);
+      const data = await res.json();
+      const changed = JSON.stringify(data) !== JSON.stringify(violations);
+      violations = data;
+      renderStats();
+      if (changed || seenIds === null) renderGrid();
+      $("dot").classList.remove("offline");
+      $("status").textContent = `Live · updated ${new Date().toLocaleTimeString()}`;
+    } catch {
+      $("dot").classList.add("offline");
+      $("status").textContent = "Can't reach the dashboard server";
+    }
+  }
+
+  document.querySelectorAll("[data-filter]").forEach((b) => {
+    b.onclick = () => {
+      filter = b.dataset.filter;
+      document.querySelectorAll("[data-filter]").forEach((x) => x.classList.toggle("active", x === b));
+      renderGrid();
+    };
+  });
+
+  $("ack-all").onclick = async () => {
+    await fetch("/api/violations/acknowledge-all", { method: "POST" });
+    refresh();
+  };
+
+  $("viewer").onclick = () => $("viewer").close();
+
+  refresh();
+  setInterval(refresh, POLL_MS);
+</script>
+</body>
+</html>
