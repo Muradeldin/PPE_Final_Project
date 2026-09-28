@@ -17,53 +17,111 @@
         </div>
         <div class="connection" id="connectionState">
           <span class="status-dot"></span>
-          <span>Checking backend</span>
+          <span>Connecting</span>
+        </div>
+        <div class="account" id="account" hidden>
+          <span id="accountEmail"></span>
+          <button class="link-button" id="signOutButton" type="button">Sign out</button>
         </div>
       </header>
 
-      <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow accent">Live safety operations</p>
-          <h2>Keep every shift<br /><em>in view.</em></h2>
-          <p class="lede">Start the on-device PPE detector and monitor its connection without leaving the control desk.</p>
-          <div class="actions">
-            <button class="button button-primary" id="startButton" type="button">Start detection <span>→</span></button>
-            <button class="button button-secondary" id="stopButton" type="button">Stop pipeline</button>
-          </div>
+      <!-- Sign-in (shown when logged out) -->
+      <section class="login" id="loginView" hidden>
+        <div class="login-copy">
+          <p class="eyebrow accent">Restricted access</p>
+          <h2>Sign in to<br /><em>the site.</em></h2>
+          <p class="lede">This dashboard shows live safety alerts with photos of workers, so it is limited to the site team.</p>
         </div>
-        <div class="radar" aria-label="Detection system status">
-          <div class="radar-ring ring-one"></div>
-          <div class="radar-ring ring-two"></div>
-          <div class="radar-sweep"></div>
-          <div class="radar-core"><span id="radarLabel">STANDBY</span></div>
-          <span class="radar-ping ping-one"></span>
-          <span class="radar-ping ping-two"></span>
-        </div>
+        <form class="login-form" id="loginForm">
+          <label class="field">
+            <span class="stat-label">Email</span>
+            <input id="email" type="email" autocomplete="username" required />
+          </label>
+          <label class="field">
+            <span class="stat-label">Password</span>
+            <input id="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="button button-primary" id="signInButton" type="submit">Sign in <span>→</span></button>
+          <p class="form-error" id="loginError" role="alert"></p>
+        </form>
       </section>
 
-      <section class="status-grid" aria-label="Pipeline details">
-        <article class="stat-card stat-card-highlight">
-          <p class="stat-label">Pipeline state</p>
-          <p class="stat-value" id="pipelineState">Offline</p>
-          <p class="stat-note" id="lastUpdate">Waiting for backend</p>
-        </article>
-        <article class="stat-card">
-          <p class="stat-label">Input source</p>
-          <p class="stat-value stat-value-small" id="sourceValue">CCTV test video</p>
-          <p class="stat-note">Configured on the Pi</p>
-        </article>
-        <article class="stat-card">
-          <p class="stat-label">Detection model</p>
-          <p class="stat-value stat-value-small">YOLOv8 NCNN</p>
-          <p class="stat-note">320 px inference</p>
-        </article>
-      </section>
+      <!-- Dashboard (shown when logged in) -->
+      <div id="appView" hidden>
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow accent">Live safety operations</p>
+            <h2>Keep every shift<br /><em>in view.</em></h2>
+            <p class="lede">Start the on-device PPE detector and monitor its connection without leaving the control desk.</p>
+            <div class="actions">
+              <button class="button button-primary" id="startButton" type="button">Start detection <span>→</span></button>
+              <button class="button button-secondary" id="stopButton" type="button">Stop pipeline</button>
+            </div>
+          </div>
+          <div class="radar" aria-label="Detection system status">
+            <div class="radar-ring ring-one"></div>
+            <div class="radar-ring ring-two"></div>
+            <div class="radar-sweep"></div>
+            <div class="radar-core"><span id="radarLabel">STANDBY</span></div>
+            <span class="radar-ping ping-one"></span>
+            <span class="radar-ping ping-two"></span>
+          </div>
+        </section>
+
+        <section class="status-grid" aria-label="Pipeline details">
+          <article class="stat-card stat-card-highlight">
+            <p class="stat-label">Pipeline state</p>
+            <p class="stat-value" id="pipelineState">Offline</p>
+            <p class="stat-note" id="lastUpdate">Waiting for the Pi</p>
+          </article>
+          <article class="stat-card">
+            <p class="stat-label">Input source</p>
+            <p class="stat-value stat-value-small" id="sourceValue">—</p>
+            <p class="stat-note">Configured on the Pi</p>
+          </article>
+          <article class="stat-card">
+            <p class="stat-label">Detection model</p>
+            <p class="stat-value stat-value-small">YOLOv8 NCNN</p>
+            <p class="stat-note" id="modelNote">320 px inference</p>
+          </article>
+        </section>
+
+        <section class="violations" aria-label="Violations">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow accent">Safety log</p>
+              <h3>Violations</h3>
+            </div>
+            <div class="toolbar">
+              <div class="tabs" role="tablist">
+                <button class="tab active" data-filter="open" type="button">Not reviewed</button>
+                <button class="tab" data-filter="all" type="button">All</button>
+              </div>
+              <button class="button button-secondary button-small" id="ackAllButton" type="button">Acknowledge all</button>
+            </div>
+          </div>
+
+          <div class="stats-row">
+            <article class="stat-card"><p class="stat-label">Today</p><p class="stat-value" id="statToday">0</p></article>
+            <article class="stat-card"><p class="stat-label">No helmet · today</p><p class="stat-value" id="statHelmet">0</p></article>
+            <article class="stat-card"><p class="stat-label">No vest · today</p><p class="stat-value" id="statVest">0</p></article>
+            <article class="stat-card stat-card-highlight"><p class="stat-label">Not reviewed</p><p class="stat-value" id="statOpen">0</p></article>
+          </div>
+
+          <div class="violation-grid" id="violationGrid"></div>
+        </section>
+      </div>
 
       <footer class="footer">
         <span>Edge PPE Controller</span>
-        <span id="apiLabel">API: http://localhost:8000</span>
+        <span id="apiLabel">Supabase</span>
       </footer>
     </main>
+
+    <dialog class="viewer" id="viewer"><img alt="Violation photo" /></dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

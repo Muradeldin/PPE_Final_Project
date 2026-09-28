@@ -1,7 +1,6 @@
 import cv2
 import time
 import threading
-import requests
 import yaml
 from collections import deque
 from queue import Queue, Empty, Full
@@ -12,6 +11,8 @@ from ultralytics.trackers.byte_tracker import BYTETracker
 from ultralytics.utils import IterableSimpleNamespace
 from ultralytics.utils.checks import check_yaml
 
+import cloud  # Supabase uploads (needs .env with the secret key)
+
 # ==============================================================================
 # CONFIGURATION & HYPERPARAMETERS
 # ==============================================================================
@@ -19,10 +20,6 @@ from ultralytics.utils.checks import check_yaml
 # Input / Output
 VIDEO_PATH = Path(__file__).parent / "media" / "cctv_test_2.mp4"
 MODEL_PATH = str(Path(__file__).parent / "models" / "best_yolo8_ncnn_model_half")  # Exported at imgsz=320
-
-# Address of the dashboard (dashboard/server.py). 127.0.0.1 = this same computer.
-# On the Pi, replace 127.0.0.1 with the Tailscale IP of the computer running the dashboard.
-CLOUD_WEBHOOK_URL = "http://127.0.0.1:8080/api/upload-crop"
 
 # Performance & Display
 HEADLESS = True
@@ -167,6 +164,7 @@ class EdgePPEPipeline:
         self.io_queue = Queue(maxsize=15)
 
         self.running = False
+        self.fps = 0.0              # Smoothed processing FPS, reported to the website
         self.last_checked = {}      # {worker_id: timestamp}
         self.last_status = {}       # {worker_id: {"helmet": bool/None, "vest": bool}}
         self.check_history = {}     # {worker_id: deque[(timestamp, helmet_bad, vest_bad)]}
@@ -207,7 +205,7 @@ class EdgePPEPipeline:
         cap.release()
 
     def _io_worker(self):
-        """Asynchronously sends violation crops to the Cloud Admin Dashboard via HTTP POST."""
+        """Asynchronously uploads violation crops to Supabase, so inference never waits on the network."""
         while self.running or not self.io_queue.empty():
             try:
                 task = self.io_queue.get(timeout=0.5)
@@ -219,17 +217,11 @@ class EdgePPEPipeline:
 
                 # Encode crop to JPEG in memory
                 _, img_encoded = cv2.imencode('.jpg', crop)
-                files = {'file': (f"worker_{worker_id}.jpg", img_encoded.tobytes(), 'image/jpeg')}
-                data = {'worker_id': str(worker_id), 'reasons': reasons_str}
 
-                # Push to cloud dashboard
-                response = requests.post(CLOUD_WEBHOOK_URL, files=files, data=data, timeout=5)
-                if response.status_code == 200:
-                    print(f"[INFO] Successfully uploaded violation for Worker {worker_id}")
-                else:
-                    print(f"[WARNING] Cloud responded with status {response.status_code}")
+                cloud.upload_violation(worker_id, reasons_str, img_encoded.tobytes())
+                print(f"[INFO] Uploaded violation for Worker {worker_id}")
             except Exception as e:
-                print(f"[ERROR] Failed to send webhook to cloud: {e}")
+                print(f"[ERROR] Failed to upload violation to Supabase: {e}")
             finally:
                 self.io_queue.task_done()
 
@@ -274,6 +266,7 @@ class EdgePPEPipeline:
             prev_time = now
             if dt > 0:
                 fps = 0.9 * fps + 0.1 * (1.0 / dt)
+                self.fps = fps
 
             if HEADLESS and (now - last_print_time) >= 2.0:
                 print(f"[INFO] Pipeline running at {fps:.1f} FPS")

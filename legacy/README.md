@@ -7,3 +7,5 @@ file paths still assume they live in the project root.
 - test_model_performance.py: quick single-image prediction test
 - old_models/: original PPE model and stock yolov8n.pt
 - annotated_output.mp4: sample output from an early version
+- dashboard/: local FastAPI violations dashboard (port 8080), replaced by the Supabase website in control/.
+  Needs fastapi, uvicorn, python-multipart. Its saved alerts are in dashboard/data/ (not in git).

@@ -6,4 +6,7 @@ __pycache__/
 # Generated output
 /worker_crops/
 /runs/
-/dashboard/data/
+**/dashboard/data/
+
+# Secrets (Supabase secret key)
+.env
