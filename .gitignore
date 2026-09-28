@@ -10,3 +10,6 @@ __pycache__/
 
 # Secrets (Supabase secret key)
 .env
+
+# Vercel CLI link (created by "vercel link")
+.vercel/
