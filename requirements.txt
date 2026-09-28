@@ -4,5 +4,5 @@ ncnn
 lap            # used by ByteTrack for tracking
 requests       # uploads to Supabase (cloud.py)
 
-# Only needed to export models to NCNN (export_to_ncnn.py)
-pnnx
+# Exporting a model to NCNN (export_to_ncnn.py) also needs pnnx;
+# Ultralytics installs it automatically the first time you export.
