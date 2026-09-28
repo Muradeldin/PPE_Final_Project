@@ -19,6 +19,7 @@ The Pi only makes outgoing connections, so it works behind any router with no po
 | `pipeline_ncnn_web.py` | Detection pipeline that uploads violations to Supabase (used by `app.py`). |
 | `pipeline_ncnn.py` | Same detection, but saves crops to `worker_crops/` and shows a video window. For testing on a PC. |
 | `cloud.py` | Supabase connection for the Pi. |
+| `stream_server.py` | Livestream of the detection video (used by `app.py`). |
 | `models/best_yolo8_ncnn_model_half/` | The model the Pi uses (YOLOv8n, NCNN, 320 px). |
 | `control/` | The website (static files, deployed to Vercel). |
 | `supabase/schema.sql` | Database tables, photo storage and permissions (already applied). |
@@ -120,6 +121,28 @@ journalctl -u ppe -f          # watch the logs live
 sudo systemctl restart ppe    # restart after changing the code
 sudo systemctl stop ppe       # stop it
 ```
+
+### 6. Livestream (Tailscale Funnel)
+
+The website's **Live view** shows the camera with the detection boxes while detection runs.
+`app.py` serves it on port 8000 of the Pi; Tailscale Funnel publishes it over HTTPS.
+
+1. Funnel must be enabled once in the Pi's Tailscale network (run `sudo tailscale funnel 8000`, open
+   the link it prints with the tailnet owner's account, click **Enable**, then `Ctrl+C`).
+2. Publish port 8000 (stays on across reboots):
+   ```bash
+   sudo tailscale funnel --bg 8000
+   sudo tailscale funnel status      # shows the public https://<pi-name>.<tailnet>.ts.net address
+   ```
+3. Put that address in `.env`:
+   ```bash
+   STREAM_PUBLIC_URL=https://muradppe.tail569fb8.ts.net
+   ```
+4. Restart: `sudo systemctl restart ppe`
+
+The stream needs a secret token that changes every time `app.py` starts; the website gets the full
+link from Supabase after sign-in, so strangers who find the address get `403 Forbidden`. It only
+uses bandwidth (about 2–3 Mbit/s per viewer) while someone has the Live view open.
 
 ### Updating the Pi later
 

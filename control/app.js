@@ -118,7 +118,53 @@ function renderDevice() {
 
   startButton.disabled = desired;
   stopButton.disabled = !desired;
+
+  updateLiveView(online, running);
 }
+
+// ---- Live view ----------------------------------------------------------------
+// The Pi streams MJPEG through Tailscale Funnel; the link (with its secret token) comes from
+// device_status, which only signed-in users can read. The stream only runs while it is on screen.
+
+const liveImage = $('#liveImage');
+const livePlaceholder = $('#livePlaceholder');
+let liveFailedAt = 0;
+
+function showLivePlaceholder(message) {
+  if (liveImage.dataset.src) {
+    liveImage.src = 'data:,';  // Closes the connection to the Pi
+    delete liveImage.dataset.src;
+  }
+  liveImage.hidden = true;
+  livePlaceholder.hidden = false;
+  livePlaceholder.textContent = message;
+}
+
+function updateLiveView(online, running) {
+  const url = device?.stream_url;
+  if (!online) return showLivePlaceholder('The Pi is offline');
+  if (!running) return showLivePlaceholder('Start detection to see the camera');
+  if (!url) return showLivePlaceholder('The Pi has not reported a stream address');
+  if (document.visibilityState !== 'visible') return showLivePlaceholder('Paused while the tab is hidden');
+  if (Date.now() - liveFailedAt < 10_000) return;  // Recently failed: keep the error message, retry later
+
+  if (liveImage.dataset.src !== url) {
+    liveImage.dataset.src = url;
+    liveImage.src = url;
+  }
+  liveImage.hidden = false;
+  livePlaceholder.hidden = true;
+}
+
+liveImage.addEventListener('error', () => {
+  if (!liveImage.dataset.src) return;  // Our own 'data:,' reset, not a real failure
+  liveFailedAt = Date.now();
+  showLivePlaceholder("Can't reach the Pi's live stream");
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (device) renderDevice();
+});
 
 async function refreshDevice() {
   const { data, error } = await db.from('device_status').select('*').eq('id', DEVICE_ID).maybeSingle();
@@ -283,6 +329,7 @@ function startPolling() {
 function stopPolling() {
   clearInterval(pollTimer);
   pollTimer = null;
+  showLivePlaceholder('Start detection to see the camera');
   device = null;
   violations = [];
   seenIds = null;

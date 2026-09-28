@@ -7,15 +7,25 @@ The Pi only makes outgoing connections, so it works behind any router.
 
 Run on the Pi:  python app.py      (Ctrl+C to quit)
 """
+import os
+import secrets
 import threading
 import time
 
-import cloud
+import cloud  # Also loads .env
 from pipeline_ncnn_web import EdgePPEPipeline, MODEL_PATH
+from stream_server import StreamServer
 
 # Video file for testing; on the Pi use 0 for the first camera
 SOURCE = "media/cctv_test.mp4"
 SYNC_SECONDS = 2.0
+
+# Livestream: served locally on STREAM_PORT, published by Tailscale Funnel on the Pi.
+# STREAM_PUBLIC_URL (in .env) is the Funnel address, e.g. https://muradppe.tail569fb8.ts.net
+STREAM_PORT = 8000
+STREAM_TOKEN = os.environ.get("STREAM_TOKEN") or secrets.token_urlsafe(24)  # New random token each start by default
+STREAM_PUBLIC_URL = os.environ.get("STREAM_PUBLIC_URL", f"http://localhost:{STREAM_PORT}").rstrip("/")
+STREAM_URL = f"{STREAM_PUBLIC_URL}/stream?token={STREAM_TOKEN}"  # Only readable by signed-in users in Supabase
 
 pipeline_instance = None
 pipeline_thread = None
@@ -42,6 +52,8 @@ def is_running():
 
 def main():
     was_running = False
+    StreamServer(lambda: pipeline_instance, STREAM_TOKEN, port=STREAM_PORT).start()
+    print(f"[AGENT] Livestream on port {STREAM_PORT}, published as {STREAM_PUBLIC_URL}")
     print(f"[AGENT] Connected to {cloud.SUPABASE_URL}, waiting for Start from the website...")
 
     while True:
@@ -61,7 +73,7 @@ def main():
 
             running = is_running()
             fps = round(pipeline_instance.fps, 1) if running else None
-            cloud.update_device_status(is_running=running, fps=fps, source=str(SOURCE))
+            cloud.update_device_status(is_running=running, fps=fps, source=str(SOURCE), stream_url=STREAM_URL)
             was_running = running
         except Exception as e:
             # Network hiccups shouldn't kill the agent; detection keeps running meanwhile

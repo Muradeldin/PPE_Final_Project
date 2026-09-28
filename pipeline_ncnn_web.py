@@ -46,6 +46,7 @@ MIN_CHECKS = 3              # Checks needed in the window before an alert can fi
 MIN_VIOLATION_SPAN = 1.5    # Seconds a worker must be observed before alerting (filters short-lived ghost boxes)
 ALERT_COOLDOWN_SECONDS = 10.0  # Per-worker gap between alerts (prevents spamming webhooks)
 STALE_WORKER_SECONDS = 30.0    # Forget workers not seen for this long (bounds memory)
+STREAM_IDLE_SECONDS = 2.0      # Stop drawing livestream frames this long after the last viewer leaves
 
 # Class IDs (Must match your trained dataset)
 PERSON_ID = 6
@@ -172,6 +173,15 @@ class EdgePPEPipeline:
         self.last_seen = {}         # {worker_id: timestamp}
         self.last_prune = 0.0
 
+        # Livestream: annotated frames are only drawn while someone is watching
+        self.stream_requested_at = 0.0
+        self.latest_frame = None    # Annotated frame for the livestream
+        self.frame_id = 0           # Increments with every new annotated frame
+
+    def request_stream(self):
+        """Called by the stream server while a viewer is connected."""
+        self.stream_requested_at = time.time()
+
     def _camera_worker(self):
         cap = cv2.VideoCapture(self.source)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
@@ -297,6 +307,10 @@ class EdgePPEPipeline:
 
             h, w = frame.shape[:2]
 
+            # Draw on a copy, so violation crops taken from `frame` stay clean
+            watched = (now - self.stream_requested_at) < STREAM_IDLE_SECONDS
+            display = frame.copy() if (watched or not HEADLESS) else None
+
             for track in tracks:
                 worker_id = int(track[4])
                 x1, y1, x2, y2 = map(int, track[:4])
@@ -361,8 +375,8 @@ class EdgePPEPipeline:
                             except Full:
                                 pass
 
-                # UI Rendering
-                if not HEADLESS:
+                # UI Rendering (window and/or livestream)
+                if display is not None:
                     ppe = self.last_status.get(worker_id)
                     if ppe is None:
                         color, label = (0, 255, 255), f"ID {worker_id} Scanning..."
@@ -377,15 +391,19 @@ class EdgePPEPipeline:
                         v_str = "V:OK" if ppe["vest"] else "V:NO"
                         label = f"ID {worker_id} [{h_str} {v_str}]"
 
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(frame, label, (x1, max(20, y1 - 8)),
+                    cv2.rectangle(display, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(display, label, (x1, max(20, y1 - 8)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
 
             self._forget_stale_workers(now)
 
+            if display is not None:
+                cv2.putText(display, f"FPS: {fps:.1f}", (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                self.latest_frame = display
+                self.frame_id += 1
+
             if not HEADLESS:
-                cv2.putText(frame, f"FPS: {fps:.1f}", (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-                cv2.imshow("Edge PPE Pipeline", frame)
+                cv2.imshow("Edge PPE Pipeline", display)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     self.running = False
 
