@@ -14,8 +14,8 @@ const lastUpdate = $('#lastUpdate');
 const sourceValue = $('#sourceValue');
 const modelNote = $('#modelNote');
 const radarLabel = $('#radarLabel');
-const startButton = $('#startButton');
-const stopButton = $('#stopButton');
+const toggleButton = $('#toggleButton');  // Start/Stop in the header
+let toggleRequestPending = false;
 
 let device = null;
 let violations = [];
@@ -57,6 +57,7 @@ function showView(session) {
   $('#appView').hidden = !signedIn;
   $('#account').hidden = !signedIn;
   $('#viewNav').hidden = !signedIn;
+  toggleButton.hidden = !signedIn;
 
   if (signedIn) {
     $('#accountEmail').textContent = session.user.email;
@@ -93,8 +94,6 @@ function renderDevice() {
   const desired = Boolean(device?.desired_running);
   const running = Boolean(device?.is_running) && online;
 
-  setConnection(online, online ? 'Pi online' : 'Pi offline');
-
   let state, note;
   if (desired && running) {
     state = 'Running';
@@ -110,6 +109,7 @@ function renderDevice() {
     note = online ? 'Ready to start' : (lastSeen ? `Pi last seen ${timeAgo(lastSeen)}` : 'The Pi has not connected yet');
   }
 
+  setConnection(online, online ? `Pi online · ${state}` : 'Pi offline');
   pipelineState.textContent = state;
   pipelineState.style.color = state === 'Running' ? '#167346' : '';
   lastUpdate.textContent = note;
@@ -117,8 +117,12 @@ function renderDevice() {
   sourceValue.textContent = sourceName(device?.source);
   modelNote.textContent = running && device.fps ? `320 px · ${device.fps.toFixed(1)} FPS on the Pi` : '320 px inference';
 
-  startButton.disabled = desired;
-  stopButton.disabled = !desired;
+  // Header button: Start while stopped, Stop while running or starting
+  toggleButton.dataset.action = desired ? 'stop' : 'start';
+  toggleButton.firstChild.textContent = desired ? 'Stop ' : 'Start ';
+  toggleButton.classList.toggle('button-primary', !desired);
+  toggleButton.classList.toggle('button-secondary', desired);
+  toggleButton.disabled = toggleRequestPending;
 
   updateLiveView(online, running);
 }
@@ -188,15 +192,16 @@ async function refreshDevice() {
 }
 
 async function setDesiredRunning(value) {
-  startButton.disabled = true;
-  stopButton.disabled = true;
+  toggleRequestPending = true;
+  toggleButton.disabled = true;
   const { error } = await db.from('device_status').update({ desired_running: value }).eq('id', DEVICE_ID);
-  if (error) lastUpdate.textContent = `Could not update: ${error.message}`;
+  toggleRequestPending = false;
+  if (error) alert(`Could not ${value ? 'start' : 'stop'} detection: ${error.message}`);
   await refreshDevice().catch(() => {});
+  toggleButton.disabled = false;
 }
 
-startButton.addEventListener('click', () => setDesiredRunning(true));
-stopButton.addEventListener('click', () => setDesiredRunning(false));
+toggleButton.addEventListener('click', () => setDesiredRunning(toggleButton.dataset.action !== 'stop'));
 
 // ---- Violations ---------------------------------------------------------------
 

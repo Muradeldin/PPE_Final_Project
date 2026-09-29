@@ -23,6 +23,8 @@
           <span class="status-dot"></span>
           <span>Connecting</span>
         </div>
+        <!-- Start/Stop detection, visible on every page -->
+        <button class="button button-primary toggle-button" id="toggleButton" type="button" hidden>Start <span class="btn-extra">detection</span></button>
         <div class="account" id="account" hidden>
           <span id="accountEmail"></span>
           <button class="link-button" id="signOutButton" type="button">Sign out</button>
@@ -85,10 +87,7 @@
               <p class="eyebrow accent">Live safety operations</p>
               <h3>Live view</h3>
             </div>
-            <div class="actions">
-              <button class="button button-primary" id="startButton" type="button">Start detection <span>→</span></button>
-              <button class="button button-secondary" id="stopButton" type="button">Stop pipeline</button>
-            </div>
+            <p class="stat-note">Plays while detection is running · Start/Stop is in the header</p>
           </div>
 
           <div class="live-layout">

@@ -90,6 +90,8 @@ h2 em { color: var(--coral); font-style: normal; }
 .view-link + .view-link { border-left: 1px solid var(--ink); }
 .view-link:hover { background: var(--panel); }
 .view-link.active { background: var(--ink); color: var(--lime); }
+.toggle-button { min-height: 40px; margin-left: 18px; padding: 0 16px; white-space: nowrap; }
+.toggle-button .btn-extra { margin-left: 0; font-size: inherit; }  /* Not the big arrow style of .button-primary span */
 .count { min-width: 18px; padding: 2px 5px; background: var(--coral); color: var(--ink); text-align: center; }
 
 /* Pages */
@@ -148,7 +150,9 @@ h3 { margin: 0; font-size: clamp(2rem, 4vw, 3rem); line-height: .95; letter-spac
 
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; row-gap: 16px; }
-  .views { order: 5; width: 100%; margin: 0; }
+  .views { order: 5; flex: 1 1 auto; margin: 0; }
+  .toggle-button { order: 6; margin-left: 10px; }
+  .btn-extra { display: none; }
   .view-link { flex: 1; }
   .live-layout { grid-template-columns: 1fr; }
   .account { margin-left: 12px; padding-left: 12px; font-size: 0; }
