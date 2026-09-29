@@ -140,6 +140,12 @@ h3 { margin: 0; font-size: clamp(2rem, 4vw, 3rem); line-height: .95; letter-spac
 .badge-helmet { background: var(--coral); color: var(--ink); }
 .badge-vest { background: var(--lime); color: var(--ink); }
 .violation-card .button { width: 100%; min-height: 40px; margin-top: auto; }
+.violation-actions { display: flex; gap: 8px; margin-top: auto; }
+.violation-actions .button { flex: 1; width: auto; margin-top: 0; }
+.violation-actions .button-danger { flex: 0 0 auto; padding: 0 14px; }
+.button-danger { background: transparent; border-color: #b23a26; color: #b23a26; }
+.button-danger:hover:not(:disabled) { background: var(--coral); color: var(--ink); border-color: var(--ink); }
+.no-photo { display: grid; place-items: center; height: 230px; background: var(--ink); color: var(--muted); font: 500 10px 'DM Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }
 .empty { grid-column: 1 / -1; padding: 60px 20px; border: 1px dashed var(--line); color: var(--muted); text-align: center; font: 11px 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
 
 .viewer { max-width: 94vw; padding: 0; border: 1px solid var(--ink); background: var(--ink); }

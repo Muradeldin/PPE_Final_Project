@@ -5,7 +5,8 @@
 --
 -- Who can do what:
 --   Pi (secret key)        : everything (the secret key bypasses these rules)
---   Logged-in site users   : read everything, acknowledge violations, start/stop the Pi
+--   Logged-in site users   : read everything, acknowledge and delete violations (and their photos),
+--                            start/stop the Pi
 --   Everyone else          : nothing
 -- ============================================================================
 
@@ -43,6 +44,10 @@ drop policy if exists "logged-in users acknowledge violations" on public.violati
 create policy "logged-in users acknowledge violations"
   on public.violations for update to authenticated using (true) with check (true);
 
+drop policy if exists "logged-in users delete violations" on public.violations;
+create policy "logged-in users delete violations"
+  on public.violations for delete to authenticated using (true);
+
 drop policy if exists "logged-in users read device status" on public.device_status;
 create policy "logged-in users read device status"
   on public.device_status for select to authenticated using (true);
@@ -51,13 +56,14 @@ drop policy if exists "logged-in users start and stop the pi" on public.device_s
 create policy "logged-in users start and stop the pi"
   on public.device_status for update to authenticated using (true) with check (true);
 
--- Site users may only change these two columns; everything else is written by the Pi
+-- Site users may only change these two columns (and delete violations); everything else is written by the Pi
 revoke insert, update, delete on public.violations    from anon, authenticated;
 revoke insert, update, delete on public.device_status from anon, authenticated;
 grant update (acknowledged)    on public.violations    to authenticated;
 grant update (desired_running) on public.device_status to authenticated;
+grant delete                   on public.violations    to authenticated;
 
--- Photos: private bucket, only logged-in users can view --------------------------
+-- Photos: private bucket, only logged-in users can view and delete ---------------
 insert into storage.buckets (id, name, public)
 values ('violations', 'violations', false)
 on conflict (id) do nothing;
@@ -65,3 +71,7 @@ on conflict (id) do nothing;
 drop policy if exists "logged-in users view violation photos" on storage.objects;
 create policy "logged-in users view violation photos"
   on storage.objects for select to authenticated using (bucket_id = 'violations');
+
+drop policy if exists "logged-in users delete violation photos" on storage.objects;
+create policy "logged-in users delete violation photos"
+  on storage.objects for delete to authenticated using (bucket_id = 'violations');

@@ -229,6 +229,7 @@ function renderStats() {
   $('#navCount').textContent = open;
   $('#navCount').hidden = open === 0;
   $('#ackAllButton').disabled = open === 0;
+  $('#deleteAllButton').disabled = violations.length === 0;
 }
 
 function violationCard(v, isNew) {
@@ -236,14 +237,22 @@ function violationCard(v, isNew) {
   const card = document.createElement('article');
   card.className = `violation-card${v.acknowledged ? ' acked' : ''}${isNew ? ' new' : ''}`;
 
-  const img = document.createElement('img');
-  img.alt = `Worker ${v.worker_id}`;
-  img.loading = 'lazy';
-  img.src = photoLinks.get(v.image_path)?.url || '';
-  img.addEventListener('click', () => {
-    $('#viewer img').src = img.src;
-    $('#viewer').showModal();
-  });
+  const photoUrl = photoLinks.get(v.image_path)?.url;
+  let photo;
+  if (photoUrl) {
+    photo = document.createElement('img');
+    photo.alt = `Worker ${v.worker_id}`;
+    photo.loading = 'lazy';
+    photo.src = photoUrl;
+    photo.addEventListener('click', () => {
+      $('#viewer img').src = photoUrl;
+      $('#viewer').showModal();
+    });
+  } else {
+    photo = document.createElement('div');
+    photo.className = 'no-photo';
+    photo.textContent = 'Photo not available';
+  }
 
   const body = document.createElement('div');
   body.className = 'violation-body';
@@ -264,23 +273,87 @@ function violationCard(v, isNew) {
   if (v.reasons.includes('no_helmet')) badges.insertAdjacentHTML('beforeend', '<span class="badge badge-helmet">No helmet</span>');
   if (v.reasons.includes('no_vest')) badges.insertAdjacentHTML('beforeend', '<span class="badge badge-vest">No vest</span>');
 
-  body.append(top, badges);
+  const actions = document.createElement('div');
+  actions.className = 'violation-actions';
 
   if (!v.acknowledged) {
-    const button = document.createElement('button');
-    button.className = 'button button-secondary';
-    button.type = 'button';
-    button.textContent = 'Acknowledge';
-    button.addEventListener('click', async () => {
-      button.disabled = true;
+    const ack = document.createElement('button');
+    ack.className = 'button button-secondary';
+    ack.type = 'button';
+    ack.textContent = 'Acknowledge';
+    ack.addEventListener('click', async () => {
+      ack.disabled = true;
       await db.from('violations').update({ acknowledged: true }).eq('id', v.id);
       refreshViolations().catch(() => {});
     });
-    body.append(button);
+    actions.append(ack);
   }
 
-  card.append(img, body);
+  const del = document.createElement('button');
+  del.className = 'button button-danger';
+  del.type = 'button';
+  del.textContent = 'Delete';
+  del.title = 'Delete this violation and its photo';
+  del.addEventListener('click', async () => {
+    if (!confirm(`Delete this violation (Worker ${v.worker_id}) and its photo? This cannot be undone.`)) return;
+    del.disabled = true;
+    try {
+      await deleteViolations([v]);
+    } catch (error) {
+      alert(`Could not delete: ${error.message}`);
+      del.disabled = false;
+    }
+    refreshViolations().catch(() => {});
+  });
+  actions.append(del);
+
+  body.append(top, badges, actions);
+  card.append(photo, body);
   return card;
+}
+
+// ---- Deleting violations (rows first, then their photos) ----------------------
+
+async function deleteViolations(rows) {
+  const { error, count } = await db.from('violations').delete({ count: 'exact' }).in('id', rows.map((v) => v.id));
+  if (error) throw error;
+  if (count === 0) throw new Error('Supabase did not allow the delete. Run the latest supabase/schema.sql.');
+  await removePhotos(rows.map((v) => v.image_path));
+}
+
+async function removePhotos(paths) {
+  for (let i = 0; i < paths.length; i += 500) {
+    const batch = paths.slice(i, i + 500);
+    const { error } = await db.storage.from('violations').remove(batch);
+    if (error) throw error;
+    batch.forEach((path) => photoLinks.delete(path));
+  }
+}
+
+async function listAllPhotos(prefix = '') {
+  const paths = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await db.storage.from('violations').list(prefix, { limit: 1000, offset });
+    if (error) throw error;
+    for (const item of data) {
+      const path = prefix ? `${prefix}/${item.name}` : item.name;
+      if (item.id === null) paths.push(...(await listAllPhotos(path)));  // A folder (photos are stored by date)
+      else paths.push(path);
+    }
+    if (data.length < 1000) return paths;
+  }
+}
+
+async function deleteAllViolations() {
+  // The page only loads the latest 200, so delete in batches until the table is empty
+  for (;;) {
+    const { data, error } = await db.from('violations').select('id, image_path').limit(500);
+    if (error) throw error;
+    if (data.length === 0) break;
+    await deleteViolations(data);
+  }
+  // Also remove any photos that no longer belong to a violation
+  await removePhotos(await listAllPhotos());
 }
 
 function renderViolations() {
@@ -325,6 +398,21 @@ document.querySelectorAll('[data-filter]').forEach((tab) => {
 $('#ackAllButton').addEventListener('click', async () => {
   $('#ackAllButton').disabled = true;
   await db.from('violations').update({ acknowledged: true }).eq('acknowledged', false);
+  refreshViolations().catch(() => {});
+});
+
+$('#deleteAllButton').addEventListener('click', async () => {
+  const count = violations.length >= 200 ? '200+' : violations.length;
+  if (!confirm(`Delete ALL ${count} violations and all their photos? This cannot be undone.`)) return;
+  const button = $('#deleteAllButton');
+  button.disabled = true;
+  button.textContent = 'Deleting…';
+  try {
+    await deleteAllViolations();
+  } catch (error) {
+    alert(`Could not delete everything: ${error.message}`);
+  }
+  button.textContent = 'Delete all';
   refreshViolations().catch(() => {});
 });
 
