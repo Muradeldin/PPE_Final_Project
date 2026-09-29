@@ -1,0 +1,8 @@
+services:
+  ppe-monitor:
+    build:
+      context: .
+    container_name: ppe-monitor
+    env_file:
+      - .env
+    restart: unless-stopped

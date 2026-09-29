@@ -1,0 +1,11 @@
+.env
+.git
+.venv
+__pycache__
+*.pyc
+.DS_Store
+runs
+worker_crops
+control
+legacy
+supabase
