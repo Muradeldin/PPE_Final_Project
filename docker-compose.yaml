@@ -5,4 +5,13 @@ services:
     container_name: ppe-monitor
     env_file:
       - .env
+    environment:
+      # Listen on all interfaces inside the container, so the published port below reaches the stream
+      STREAM_HOST: 0.0.0.0
+    devices:
+      # USB camera (use SOURCE=0 in .env). Remove this if the Pi has no camera plugged in.
+      - /dev/video0:/dev/video0
+    ports:
+      # Livestream for Tailscale Funnel; bound to the Pi's localhost only, not the local network
+      - "127.0.0.1:8000:8000"
     restart: unless-stopped

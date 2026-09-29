@@ -72,19 +72,13 @@ video ends, the website goes back to Offline by itself. Stop the program with `C
 
 ### 4. Switch to the camera
 
-In `app.py`, change:
+Add this line to `.env`:
 
-```python
-SOURCE = "media/cctv_test.mp4"
+```bash
+SOURCE=0
 ```
 
-to
-
-```python
-SOURCE = 0
-```
-
-This works for a **USB webcam**. The **Raspberry Pi Camera Module** (ribbon cable) is not supported
+This works for a **USB webcam** (`0` is the first camera). Without it, the test video is used. The **Raspberry Pi Camera Module** (ribbon cable) is not supported
 by this code yet; it needs a small change to read frames with `picamera2`.
 
 ### 5. Start automatically on boot
@@ -144,12 +138,27 @@ The stream needs a secret token that changes every time `app.py` starts; the web
 link from Supabase after sign-in, so strangers who find the address get `403 Forbidden`. It only
 uses bandwidth (about 2–3 Mbit/s per viewer) while someone has the Live view open.
 
+### Alternative: run with Docker instead of steps 1 and 5
+
+Use **either** Docker **or** the systemd service, never both (two copies would fight over the camera).
+If the service is installed, turn it off first: `sudo systemctl disable --now ppe`.
+
+```bash
+cp .env.example .env && nano .env     # secret key, SOURCE=0, STREAM_PUBLIC_URL
+docker compose up -d --build          # build and start (restarts automatically)
+docker compose logs -f                # watch the logs
+```
+
+`docker-compose.yaml` passes the USB camera (`/dev/video0`) into the container and publishes the
+livestream on the Pi's `127.0.0.1:8000`, so `sudo tailscale funnel --bg 8000` works the same way.
+If no camera is plugged in, remove the `devices:` lines or the container won't start.
+
 ### Updating the Pi later
 
 ```bash
 cd PPE_Final_Project
 git pull
-sudo systemctl restart ppe
+sudo systemctl restart ppe            # or with Docker: docker compose up -d --build
 ```
 
 ## Running on a PC (for testing)

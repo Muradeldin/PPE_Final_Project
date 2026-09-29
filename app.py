@@ -16,12 +16,15 @@ import cloud  # Also loads .env
 from pipeline_ncnn_web import EdgePPEPipeline, MODEL_PATH
 from stream_server import StreamServer
 
-# Video file for testing; on the Pi use 0 for the first camera
-SOURCE = "media/cctv_test.mp4"
+# Input: a video file for testing, or a camera number. Set SOURCE=0 in .env for the first camera.
+SOURCE = os.environ.get("SOURCE", "media/cctv_test.mp4")
+SOURCE = int(SOURCE) if SOURCE.isdigit() else SOURCE
 SYNC_SECONDS = 2.0
 
-# Livestream: served locally on STREAM_PORT, published by Tailscale Funnel on the Pi.
+# Livestream: served on STREAM_HOST:STREAM_PORT, published by Tailscale Funnel on the Pi.
 # STREAM_PUBLIC_URL (in .env) is the Funnel address, e.g. https://muradppe.tail569fb8.ts.net
+# STREAM_HOST stays 127.0.0.1 normally; inside Docker it must be 0.0.0.0 (set in docker-compose.yaml)
+STREAM_HOST = os.environ.get("STREAM_HOST", "127.0.0.1")
 STREAM_PORT = 8000
 STREAM_TOKEN = os.environ.get("STREAM_TOKEN") or secrets.token_urlsafe(24)  # New random token each start by default
 STREAM_PUBLIC_URL = os.environ.get("STREAM_PUBLIC_URL", f"http://localhost:{STREAM_PORT}").rstrip("/")
@@ -52,7 +55,7 @@ def is_running():
 
 def main():
     was_running = False
-    StreamServer(lambda: pipeline_instance, STREAM_TOKEN, port=STREAM_PORT).start()
+    StreamServer(lambda: pipeline_instance, STREAM_TOKEN, host=STREAM_HOST, port=STREAM_PORT).start()
     print(f"[AGENT] Livestream on port {STREAM_PORT}, published as {STREAM_PUBLIC_URL}")
     print(f"[AGENT] Connected to {cloud.SUPABASE_URL}, waiting for Start from the website...")
 
