@@ -108,6 +108,9 @@ h2 em { color: var(--coral); font-style: normal; }
 .live-status .stat-card { min-height: 0; padding: 20px 22px; border-right: 0; border-bottom: 1px solid var(--line); }
 .live-status .stat-card:last-child { border-bottom: 0; }
 .live-status .stat-value { margin: 14px 0 6px; }
+.live-status .temp-warn { background: #fff4d6; }
+.live-status .temp-hot { background: #fde2dc; }
+.live-status .temp-hot .stat-value { color: #b23a26; }
 .live-badge { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 7px; padding: 5px 9px; background: var(--ink); color: var(--lime); font: 500 10px 'DM Mono', monospace; letter-spacing: .12em; text-transform: uppercase; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); animation: blink 1.4s ease-in-out infinite; }
 @keyframes blink { 50% { opacity: .25; } }
@@ -141,8 +144,8 @@ h3 { margin: 0; font-size: clamp(2rem, 4vw, 3rem); line-height: .95; letter-spac
 .badge-vest { background: var(--lime); color: var(--ink); }
 .violation-card .button { width: 100%; min-height: 40px; margin-top: auto; }
 .violation-actions { display: flex; gap: 8px; margin-top: auto; }
-.violation-actions .button { flex: 1; width: auto; margin-top: 0; }
-.violation-actions .button-danger { flex: 0 0 auto; padding: 0 14px; }
+.violation-actions .button { flex: 1; width: auto; min-width: 0; margin-top: 0; padding: 0 10px; }
+.violation-actions .button-danger { flex: 0 0 auto; padding: 0 12px; }
 .button-danger { background: transparent; border-color: #b23a26; color: #b23a26; }
 .button-danger:hover:not(:disabled) { background: var(--coral); color: var(--ink); border-color: var(--ink); }
 .no-photo { display: grid; place-items: center; height: 230px; background: var(--ink); color: var(--muted); font: 500 10px 'DM Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }

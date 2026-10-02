@@ -153,6 +153,18 @@ docker compose logs -f                # watch the logs
 livestream on the Pi's `127.0.0.1:8000`, so `sudo tailscale funnel --bg 8000` works the same way.
 If no camera is plugged in, remove the `devices:` lines or the container won't start.
 
+### Pi temperature
+
+The Pi reports its CPU temperature with every status update (from `/sys/class/thermal`, so it also
+works in Docker). The website's Live tab shows it with the highest value seen; a Pi 4 slows itself
+down at 80°C. The database needs this column once (it is also in `supabase/schema.sql`):
+
+```sql
+alter table public.device_status add column if not exists cpu_temp real;
+```
+
+Until the column exists the Pi keeps working and simply doesn't send the temperature.
+
 ### Updating the Pi later
 
 ```bash

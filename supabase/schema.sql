@@ -27,9 +27,12 @@ create table if not exists public.device_status (
   is_running      boolean     not null default false,  -- reported by the Pi
   source          text,                                 -- reported by the Pi (video file or camera)
   fps             real,                                 -- reported by the Pi
-  stream_url      text,                                 -- reserved for the livestream
-  last_seen       timestamptz                           -- Pi heartbeat, every ~2 s
+  stream_url      text,                                 -- livestream link (with token), reported by the Pi
+  last_seen       timestamptz,                          -- Pi heartbeat, every ~2 s
+  cpu_temp        real                                  -- Pi CPU temperature in °C, reported by the Pi
 );
+-- For databases created before cpu_temp existed
+alter table public.device_status add column if not exists cpu_temp real;
 insert into public.device_status (id) values ('pi') on conflict (id) do nothing;
 
 -- Row-level security ------------------------------------------------------------

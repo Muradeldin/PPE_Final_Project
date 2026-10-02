@@ -116,6 +116,7 @@ function renderDevice() {
   radarLabel.textContent = running ? 'ACTIVE' : (online ? 'STANDBY' : 'OFFLINE');
   sourceValue.textContent = sourceName(device?.source);
   modelNote.textContent = running && device.fps ? `320 px · ${device.fps.toFixed(1)} FPS on the Pi` : '320 px inference';
+  renderTemperature(online);
 
   // Header button: Start while stopped, Stop while running or starting
   toggleButton.dataset.action = desired ? 'stop' : 'start';
@@ -183,6 +184,26 @@ liveImage.addEventListener('error', () => {
 document.addEventListener('visibilitychange', () => {
   if (device) renderDevice();
 });
+
+// Pi 4 starts throttling (slowing the CPU) at 80°C
+const TEMP_WARN = 70, TEMP_HOT = 80;
+let tempMax = null;   // highest temperature seen since this page was opened
+
+function renderTemperature(online) {
+  const card = $('#tempCard');
+  const temp = online && typeof device?.cpu_temp === 'number' ? device.cpu_temp : null;
+  card.classList.toggle('temp-warn', temp !== null && temp >= TEMP_WARN && temp < TEMP_HOT);
+  card.classList.toggle('temp-hot', temp !== null && temp >= TEMP_HOT);
+  if (temp === null) {
+    $('#tempValue').textContent = '—';
+    $('#tempNote').textContent = online ? 'Not reported by the Pi' : 'Pi offline';
+    return;
+  }
+  tempMax = tempMax === null ? temp : Math.max(tempMax, temp);
+  $('#tempValue').textContent = `${temp.toFixed(1)}°C`;
+  $('#tempNote').textContent = temp >= TEMP_HOT ? 'Hot – the Pi is slowing down'
+    : `Max ${tempMax.toFixed(1)}°C · slows at ${TEMP_HOT}°C`;
+}
 
 async function refreshDevice() {
   const { data, error } = await db.from('device_status').select('*').eq('id', DEVICE_ID).maybeSingle();
@@ -440,6 +461,7 @@ function stopPolling() {
   pollTimer = null;
   stopStream();
   device = null;
+  tempMax = null;
   violations = [];
   seenIds = null;
   photoLinks.clear();

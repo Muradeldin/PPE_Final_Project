@@ -76,14 +76,32 @@ def get_desired_running():
     return bool(rows and rows[0]["desired_running"])
 
 
+def read_cpu_temp():
+    """CPU temperature in °C from the Linux thermal sensor (works on the Pi and inside Docker); None elsewhere."""
+    try:
+        with open("/sys/class/thermal/thermal_zone0/temp") as f:
+            return round(int(f.read().strip()) / 1000, 1)
+    except (OSError, ValueError):
+        return None
+
+
 def update_device_status(**fields):
-    """Heartbeat: reports is_running / fps / source etc. and stamps last_seen."""
+    """Heartbeat: reports is_running / fps / source / CPU temperature and stamps last_seen."""
     fields["last_seen"] = datetime.now(timezone.utc).isoformat()
-    response = requests.patch(
-        f"{SUPABASE_URL}/rest/v1/device_status",
-        headers=_headers(Prefer="return=minimal"),
-        params={"id": f"eq.{DEVICE_ID}"},
-        json=fields,
-        timeout=TIMEOUT,
-    )
+    fields.setdefault("cpu_temp", read_cpu_temp())
+
+    def send(body):
+        return requests.patch(
+            f"{SUPABASE_URL}/rest/v1/device_status",
+            headers=_headers(Prefer="return=minimal"),
+            params={"id": f"eq.{DEVICE_ID}"},
+            json=body,
+            timeout=TIMEOUT,
+        )
+
+    response = send(fields)
+    if response.status_code == 400 and "cpu_temp" in response.text:
+        # The cpu_temp column hasn't been added in Supabase yet: keep the heartbeat working without it
+        fields.pop("cpu_temp")
+        response = send(fields)
     response.raise_for_status()
