@@ -1,0 +1,138 @@
+[
+ {
+  "name": "PyTorch FP32 @416",
+  "size_mb": 6.2,
+  "imgsz": 416,
+  "mAP50": 0.507,
+  "mAP50_95": 0.253,
+  "P": 0.599,
+  "R": 0.496,
+  "ap50_4cls": {
+   "helmet": 0.929,
+   "vest": 0.871,
+   "Person": 0.805,
+   "no_helmet": 0.092
+  },
+  "mAP50_4cls": 0.674,
+  "ms_per_img_pc": 21.3
+ },
+ {
+  "name": "PyTorch FP32 @320",
+  "size_mb": 6.2,
+  "imgsz": 320,
+  "mAP50": 0.498,
+  "mAP50_95": 0.254,
+  "P": 0.607,
+  "R": 0.501,
+  "ap50_4cls": {
+   "helmet": 0.924,
+   "vest": 0.877,
+   "Person": 0.797,
+   "no_helmet": 0.103
+  },
+  "mAP50_4cls": 0.675,
+  "ms_per_img_pc": 16.4
+ },
+ {
+  "name": "NCNN FP32",
+  "size_mb": 12.1,
+  "imgsz": 320,
+  "mAP50": 0.507,
+  "mAP50_95": 0.25,
+  "P": 0.574,
+  "R": 0.521,
+  "ap50_4cls": {
+   "helmet": 0.916,
+   "vest": 0.882,
+   "Person": 0.789,
+   "no_helmet": 0.17
+  },
+  "mAP50_4cls": 0.689,
+  "ms_per_img_pc": 10.4
+ },
+ {
+  "name": "NCNN FP16 (deployed)",
+  "size_mb": 6.1,
+  "imgsz": 320,
+  "mAP50": 0.507,
+  "mAP50_95": 0.25,
+  "P": 0.577,
+  "R": 0.521,
+  "ap50_4cls": {
+   "helmet": 0.916,
+   "vest": 0.882,
+   "Person": 0.789,
+   "no_helmet": 0.169
+  },
+  "mAP50_4cls": 0.689,
+  "ms_per_img_pc": 10.6
+ },
+ {
+  "name": "TFLite FP32",
+  "size_mb": 12.1,
+  "imgsz": 320,
+  "mAP50": 0.507,
+  "mAP50_95": 0.25,
+  "P": 0.574,
+  "R": 0.521,
+  "ap50_4cls": {
+   "helmet": 0.916,
+   "vest": 0.882,
+   "Person": 0.789,
+   "no_helmet": 0.17
+  },
+  "mAP50_4cls": 0.689,
+  "ms_per_img_pc": 16.6
+ },
+ {
+  "name": "TFLite FP16",
+  "size_mb": 6.1,
+  "imgsz": 320,
+  "mAP50": 0.507,
+  "mAP50_95": 0.25,
+  "P": 0.574,
+  "R": 0.521,
+  "ap50_4cls": {
+   "helmet": 0.916,
+   "vest": 0.882,
+   "Person": 0.789,
+   "no_helmet": 0.169
+  },
+  "mAP50_4cls": 0.689,
+  "ms_per_img_pc": 16.8
+ },
+ {
+  "name": "TFLite INT8 weights only",
+  "size_mb": 3.2,
+  "imgsz": 320,
+  "mAP50": 0.51,
+  "mAP50_95": 0.25,
+  "P": 0.576,
+  "R": 0.526,
+  "ap50_4cls": {
+   "helmet": 0.912,
+   "vest": 0.883,
+   "Person": 0.797,
+   "no_helmet": 0.176
+  },
+  "mAP50_4cls": 0.692,
+  "ms_per_img_pc": 15.1
+ },
+ {
+  "name": "TFLite INT8 full PTQ",
+  "size_mb": 3.2,
+  "imgsz": 320,
+  "mAP50": 0.283,
+  "mAP50_95": 0.083,
+  "P": 0.341,
+  "R": 0.347,
+  "ap50_4cls": {
+   "helmet": 0.498,
+   "vest": 0.747,
+   "Person": 0.536,
+   "no_helmet": 0.143
+  },
+  "mAP50_4cls": 0.481,
+  "ms_per_img_pc": 13.0
+ }
+]

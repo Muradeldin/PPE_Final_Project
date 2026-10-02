@@ -13,3 +13,6 @@ __pycache__/
 
 # Vercel CLI link (created by "vercel link")
 .vercel/
+
+# Datasets downloaded by Ultralytics (training/validation images)
+/datasets/
