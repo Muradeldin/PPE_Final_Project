@@ -102,23 +102,6 @@
   "ms_per_img_pc": 16.8
  },
  {
-  "name": "TFLite INT8 weights only",
-  "size_mb": 3.2,
-  "imgsz": 320,
-  "mAP50": 0.51,
-  "mAP50_95": 0.25,
-  "P": 0.576,
-  "R": 0.526,
-  "ap50_4cls": {
-   "helmet": 0.912,
-   "vest": 0.883,
-   "Person": 0.797,
-   "no_helmet": 0.176
-  },
-  "mAP50_4cls": 0.692,
-  "ms_per_img_pc": 15.1
- },
- {
   "name": "TFLite INT8 full PTQ",
   "size_mb": 3.2,
   "imgsz": 320,

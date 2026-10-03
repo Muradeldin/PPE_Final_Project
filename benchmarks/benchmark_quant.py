@@ -29,7 +29,6 @@ MODELS = [
     ("NCNN FP16 (deployed)", ROOT / "models" / "best_yolo8_ncnn_model_half"),
     ("TFLite FP32", ROOT / "models" / "quant" / "best_yolo8_fp32.tflite"),
     ("TFLite FP16", ROOT / "models" / "quant" / "best_yolo8_fp16.tflite"),
-    ("TFLite INT8 weights only", ROOT / "models" / "quant" / "best_yolo8_int8_weights.tflite"),
     ("TFLite INT8 full PTQ", ROOT / "models" / "quant" / "best_yolo8_int8_full.tflite"),
 ]
 
